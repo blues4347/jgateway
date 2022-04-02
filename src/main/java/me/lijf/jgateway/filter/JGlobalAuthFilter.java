@@ -2,6 +2,7 @@ package me.lijf.jgateway.filter;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import me.lijf.jgateway.entity.JAppAccount;
 import me.lijf.jgateway.entity.JRouteDefinition;
@@ -13,6 +14,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequestDecorator;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -22,6 +24,7 @@ import sun.misc.BASE64Decoder;
 import javax.annotation.PostConstruct;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +46,21 @@ public class JGlobalAuthFilter implements GlobalFilter, Ordered {
             String encrypted=headers.getFirst("Authorization").replace(AUTH_METHOD,"").trim();
             BASE64Decoder decoder=new BASE64Decoder();
             String authStr=new String(decoder.decodeBuffer(encrypted),"UTF-8");
-            if(!validate(authStr)) throw new RuntimeException("Authorisation failed.");
-            return chain.filter(exchange);
+            String[] authentication=authStr.split(":");
+            String appkey=authentication[0],secret=authentication[1];
+            if(!validate(appkey,secret)) throw new RuntimeException("Authorisation failed.");
+
+            ServerHttpRequestDecorator requestDecorator = new ServerHttpRequestDecorator(exchange.getRequest()){
+                //HttpHeader染色
+                @Override
+                public HttpHeaders getHeaders(){
+                    HttpHeaders httpHeaders=new HttpHeaders();
+                    httpHeaders.putAll(exchange.getRequest().getHeaders());
+                    httpHeaders.set("5i5j-appkey",appkey);
+                    return httpHeaders;
+                }
+            };
+            return chain.filter(exchange.mutate().request(requestDecorator).build());
         }catch (RuntimeException e){
             return this.exceptionHandler(exchange,HttpStatus.UNAUTHORIZED,e);
         }catch (Exception e){
@@ -52,9 +68,7 @@ public class JGlobalAuthFilter implements GlobalFilter, Ordered {
         }
     }
 
-    private boolean validate(String authStr){
-        String[] authentication=authStr.split(":");
-        String appkey=authentication[0],secret=authentication[1];
+    private boolean validate(String appkey,String secret){
         return apps.stream().filter(x-> x.getAppId().equals(appkey) && x.getSecretKey().equals(secret)).findAny().isPresent();
     }
 
