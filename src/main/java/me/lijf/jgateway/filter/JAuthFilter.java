@@ -31,7 +31,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-public class JGlobalAuthFilter implements GlobalFilter, Ordered {
+public class JAuthFilter implements GlobalFilter, Ordered {
     @Autowired
     ObjectMapper mapper;
 
