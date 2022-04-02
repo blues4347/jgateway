@@ -1,22 +1,15 @@
 package me.lijf.jgateway.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.util.JSONPObject;
-import io.micrometer.core.instrument.util.IOUtils;
 import lombok.extern.slf4j.Slf4j;
 import me.lijf.jgateway.entity.JFilterDefinition;
 import me.lijf.jgateway.entity.JPredicateDefinition;
 import me.lijf.jgateway.entity.JRouteDefinition;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.json.JsonParser;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
-import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
-import org.springframework.cloud.gateway.handler.predicate.PathRoutePredicateFactory;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
-import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.route.*;
-import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.cloud.gateway.support.NotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -29,9 +22,7 @@ import reactor.core.publisher.Mono;
 import javax.annotation.PostConstruct;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.util.*;
 
 @Slf4j
@@ -147,13 +138,13 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
 
     @PostConstruct
     public void init() throws IOException {
-        log.info("开始加载存量路由...");
+        log.info("开始加载路由...");
         this.loadFromFile();
-        log.info("存量路由加载完毕，加载了{}条路由。",this.getAllRoutes().size());
+        log.info("路由加载完毕，加载数量：{}",this.getAllRoutes().size());
     }
 
     private void loadFromFile() throws IOException {
-        ClassPathResource resource=new ClassPathResource("init.json");
+        ClassPathResource resource=new ClassPathResource("routes.json");
         FileReader reader=new FileReader(resource.getFile());
         JRouteDefinition definition= mapper.readValue(reader,JRouteDefinition.class);
         this.add(definition);
