@@ -33,8 +33,7 @@ public class RouteController {
 
     @PostMapping("/route")
     public Map<String,Object> addRd(@RequestBody JRouteDefinition definition) {
-        RouteDefinition rd = assembleRouteDefinition(definition);
-        this.service.add(rd);
+        this.service.add(definition);
         return this.getRoutes();
     }
 
@@ -43,44 +42,4 @@ public class RouteController {
         service.delete(id);
         return this.getRoutes();
     }
-
-    private RouteDefinition assembleRouteDefinition(JRouteDefinition definition) {
-        RouteDefinition ret = new RouteDefinition();
-        ret.setId(definition.getId());
-        ret.setOrder(definition.getOrder());
-
-        //设置断言
-        List<PredicateDefinition> pdList=new ArrayList<>();
-        List<JPredicateDefinition> predicateDefinitions=definition.getPredicates();
-        for (JPredicateDefinition pd: predicateDefinitions) {
-            PredicateDefinition predicate = new PredicateDefinition();
-            predicate.setArgs(pd.getArgs());
-            predicate.setName(pd.getName());
-            pdList.add(predicate);
-        }
-        ret.setPredicates(pdList);
-
-        //设置过滤器
-        List<FilterDefinition> fdList = new ArrayList();
-        List<JFilterDefinition> gatewayFilters = definition.getFilters();
-        for(JFilterDefinition filterDefinition : gatewayFilters){
-            FilterDefinition filter = new FilterDefinition();
-            filter.setName(filterDefinition.getName());
-            filter.setArgs(filterDefinition.getArgs());
-            fdList.add(filter);
-        }
-        ret.setFilters(fdList);
-
-        URI uri = null;
-        if(definition.getUri().startsWith("http")){
-            uri = UriComponentsBuilder.fromHttpUrl(definition.getUri()).build().toUri();
-        }else{
-            // uri为 lb://consumer-service 时使用下面的方法
-            uri = URI.create(definition.getUri());
-        }
-        ret.setUri(uri);
-        return ret;
-    }
-
-
 }

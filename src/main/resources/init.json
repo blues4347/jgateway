@@ -1,0 +1,19 @@
+{
+  "id":"Route0",
+  "order":1,
+  "uri":"http://localhost:18000",
+  "predicates":[
+    {
+    "name":"Path",
+    "args":{
+      "pattern":"/route0/**"
+    }
+  }],
+  "filters":[
+    {
+    "name":"StripPrefix",
+    "args":{
+      "_genkey_0":"1"
+    }
+  }]
+}

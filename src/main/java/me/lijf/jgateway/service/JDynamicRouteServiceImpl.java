@@ -1,7 +1,16 @@
 package me.lijf.jgateway.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.util.JSONPObject;
+import io.micrometer.core.instrument.util.IOUtils;
+import lombok.extern.slf4j.Slf4j;
+import me.lijf.jgateway.entity.JFilterDefinition;
+import me.lijf.jgateway.entity.JPredicateDefinition;
+import me.lijf.jgateway.entity.JRouteDefinition;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.json.JsonParser;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
+import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.PathRoutePredicateFactory;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
@@ -11,14 +20,25 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.cloud.gateway.support.NotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.PostConstruct;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.*;
 
+@Slf4j
 @Service
 public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware {
+    @Autowired
+    ObjectMapper mapper;
     @Autowired
     private RouteDefinitionRepository repository;
     @Autowired
@@ -57,13 +77,51 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
         return rtn;
     }
 
-    public void add(RouteDefinition definition){
+    public void add(JRouteDefinition definition){
         //不加subscribe时，无法执行后面的publish。
-        writer.save(Mono.just(definition)).subscribe();
+        writer.save(Mono.just(this.assembleRouteDefinition(definition))).subscribe();
         publisher.publishEvent(new RefreshRoutesEvent(this));
     }
 
-    public String update(RouteDefinition definition) {
+    private RouteDefinition assembleRouteDefinition(JRouteDefinition definition) {
+        RouteDefinition ret = new RouteDefinition();
+        ret.setId(definition.getId());
+        ret.setOrder(definition.getOrder());
+
+        //设置断言
+        List<PredicateDefinition> pdList=new ArrayList<>();
+        List<JPredicateDefinition> predicateDefinitions=definition.getPredicates();
+        for (JPredicateDefinition pd: predicateDefinitions) {
+            PredicateDefinition predicate = new PredicateDefinition();
+            predicate.setArgs(pd.getArgs());
+            predicate.setName(pd.getName());
+            pdList.add(predicate);
+        }
+        ret.setPredicates(pdList);
+
+        //设置过滤器
+        List<FilterDefinition> fdList = new ArrayList();
+        List<JFilterDefinition> gatewayFilters = definition.getFilters();
+        for(JFilterDefinition filterDefinition : gatewayFilters){
+            FilterDefinition filter = new FilterDefinition();
+            filter.setName(filterDefinition.getName());
+            filter.setArgs(filterDefinition.getArgs());
+            fdList.add(filter);
+        }
+        ret.setFilters(fdList);
+
+        URI uri = null;
+        if(definition.getUri().startsWith("http")){
+            uri = UriComponentsBuilder.fromHttpUrl(definition.getUri()).build().toUri();
+        }else{
+            // uri为 lb://consumer-service 时使用下面的方法
+            uri = URI.create(definition.getUri());
+        }
+        ret.setUri(uri);
+        return ret;
+    }
+
+    public String update(JRouteDefinition definition) {
         try {
             this.delete(definition.getId());
         } catch (Exception e) {
@@ -85,5 +143,19 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
         }, (t) -> {
             return Mono.just(ResponseEntity.notFound().build());
         });
+    }
+
+    @PostConstruct
+    public void init() throws IOException {
+        log.info("开始加载存量路由...");
+        this.loadFromFile();
+        log.info("存量路由加载完毕，加载了{}条路由。",this.getAllRoutes().size());
+    }
+
+    private void loadFromFile() throws IOException {
+        ClassPathResource resource=new ClassPathResource("init.json");
+        FileReader reader=new FileReader(resource.getFile());
+        JRouteDefinition definition= mapper.readValue(reader,JRouteDefinition.class);
+        this.add(definition);
     }
 }
