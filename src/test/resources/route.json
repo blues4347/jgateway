@@ -1,0 +1,21 @@
+{
+  "id":"Route0",
+  "order":1,
+  "uri":"http://localhost:18000",
+  "predicates":[
+    {
+    //只能选择Gateway断言工厂
+    "name":"Path",
+    "args":{
+      "pattern":"/route0/**"
+    }
+  }],
+  "filters":[
+    {
+    //只能选择Gateway过滤器工厂
+    "name":"StripPrefix",
+    "args":{
+      "_genkey_0":"1"
+    }
+  }]
+}
