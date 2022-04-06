@@ -14,7 +14,7 @@ public class JRequestLoggingFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String appkey=exchange.getRequest().getHeaders().getFirst("5i5j-appkey");
+        String appkey=exchange.getRequest().getHeaders().getFirst("appkey");
         log.info("{}@{} requests {}",appkey,exchange.getRequest().getRemoteAddress().getHostString(),exchange.getRequest().getPath());
         return chain.filter(exchange);
     }

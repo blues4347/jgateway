@@ -1,5 +1,6 @@
 package me.lijf.jgateway.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import me.lijf.jgateway.entity.JFilterDefinition;
@@ -13,6 +14,7 @@ import org.springframework.cloud.gateway.route.*;
 import org.springframework.cloud.gateway.support.NotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
+import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,8 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
 
     @Autowired
     private RouteLocator locator;
+
+    private Map<String,String> patterns=new HashMap<>();
 
     @Override
     public void setApplicationEventPublisher(ApplicationEventPublisher applicationEventPublisher) {
@@ -68,8 +72,20 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
         return rtn;
     }
 
+    public void add(List<JRouteDefinition> definitions){
+        definitions.stream().forEach(definition-> {
+            Optional<JPredicateDefinition> pathPatternPredicate = definition.getPredicates().stream().filter(prdeicate -> "Path".equals(prdeicate.getName())).findFirst();
+            if (!pathPatternPredicate.isPresent()) throw new RuntimeException("未定义路由的路径样式。");
+            Map<String, String> args = pathPatternPredicate.get().getArgs();
+            patterns.put(definition.getId(), args.get("pattern"));
+
+            //不加subscribe时，无法执行后面的publish。
+            writer.save(Mono.just(this.assembleRouteDefinition(definition))).subscribe();
+        });
+        publisher.publishEvent(new RefreshRoutesEvent(this));
+    }
+
     public void add(JRouteDefinition definition){
-        //不加subscribe时，无法执行后面的publish。
         writer.save(Mono.just(this.assembleRouteDefinition(definition))).subscribe();
         publisher.publishEvent(new RefreshRoutesEvent(this));
     }
@@ -146,7 +162,11 @@ public class JDynamicRouteServiceImpl implements ApplicationEventPublisherAware 
     private void loadFromFile() throws IOException {
         ClassPathResource resource=new ClassPathResource("routes.json");
         FileReader reader=new FileReader(resource.getFile());
-        JRouteDefinition definition= mapper.readValue(reader,JRouteDefinition.class);
-        this.add(definition);
+        List<JRouteDefinition> definitions= mapper.readValue(reader,new TypeReference<List<JRouteDefinition>>() { });
+        this.add(definitions);
+    }
+
+    public Map<String, String> getPatterns() {
+        return patterns;
     }
 }

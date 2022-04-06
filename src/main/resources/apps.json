@@ -1,6 +1,9 @@
 [
   {
     "appId": "lijf",
-    "secretKey": "1q2w3e4r"
+    "secretKey": "1q2w3e4r",
+    "authorities":[
+      "stub"
+    ]
   }
 ]

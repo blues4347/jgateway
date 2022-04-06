@@ -1,4 +1,4 @@
-{
+[{
   "id":"Route0",
   "order":1,
   "uri":"http://localhost:18000",
@@ -16,4 +16,4 @@
       "_genkey_0":"1"
     }
   }]
-}
+}]
